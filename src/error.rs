@@ -1,6 +1,5 @@
 use serde::Deserialize;
-use std::error;
-use std::fmt;
+use std::{error, fmt};
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -13,7 +12,7 @@ impl<T> Into<Result<T, Error>> for ApiResult<T> {
     fn into(self) -> Result<T, Error> {
         match self {
             ApiResult::Ok { result: v } => Ok(v),
-            ApiResult::Err { ok: _, error: e } => Err(Error::ApiError(e)),
+            ApiResult::Err { error: e, .. } => Err(Error::ApiError(e)),
         }
     }
 }
@@ -52,5 +51,7 @@ impl From<reqwest::Error> for Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self { Error::IoError(e) }
+    fn from(e: std::io::Error) -> Self {
+        Error::IoError(e)
+    }
 }

@@ -15,15 +15,15 @@
 pub mod error;
 pub mod types;
 
-use std::collections::HashMap;
-
-use reqwest::Client;
-
 pub use error::*;
 pub use types::*;
-use std::path::Path;
-use reqwest::multipart::Form;
-use reqwest::multipart::Part;
+
+use std::{collections::HashMap, path::Path};
+
+use reqwest::{
+    multipart::{Form, Part},
+    Client,
+};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -103,7 +103,10 @@ impl AccountBuilder {
                 ("access_token", self.access_token.as_ref().unwrap()),
                 ("short_name", &self.short_name),
                 ("author_name", self.author_name.as_ref().unwrap()),
-                ("author_url", self.author_url.as_ref().unwrap_or(&String::new())),
+                (
+                    "author_url",
+                    self.author_url.as_ref().unwrap_or(&String::new()),
+                ),
             ])
             .send()?;
         let json: Result<Account> = response.json::<ApiResult<Account>>()?.into();
@@ -294,7 +297,9 @@ impl Telegraph {
     /// let view2 = Telegraph::get_views("Sample-Page-12-15", &vec![2019, 5, 19, 12]); // year-month-day-hour
     /// ```
     pub fn get_views(path: &str, time: &[i32]) -> Result<PageViews> {
-        let params = ["year", "month", "day", "hour"].iter().zip(time)
+        let params = ["year", "month", "day", "hour"]
+            .iter()
+            .zip(time)
             .collect::<HashMap<_, _>>();
 
         let mut response = Client::new()
