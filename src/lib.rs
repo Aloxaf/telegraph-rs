@@ -21,6 +21,9 @@ use reqwest::Client;
 
 pub use error::*;
 pub use types::*;
+use std::path::Path;
+use reqwest::multipart::Form;
+use reqwest::multipart::Part;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -41,7 +44,9 @@ impl AccountBuilder {
     }
 
     /// Account name, helps users with several accounts remember which they are currently using.
+    ///
     /// Displayed to the user above the "Edit/Publish" button on Telegra.ph,
+    ///
     /// other users don't see this name.
     pub fn short_name(mut self, short_name: &str) -> Self {
         self.short_name = short_name.to_owned();
@@ -61,6 +66,7 @@ impl AccountBuilder {
     }
 
     /// Default profile link, opened when users click on the author's name below the title.
+    ///
     /// Can be any link, not necessarily to a Telegram profile or channel.
     pub fn author_url(mut self, author_url: &str) -> Self {
         self.author_url = Some(author_url.to_owned());
@@ -68,6 +74,7 @@ impl AccountBuilder {
     }
 
     /// If `access_token` is not set, an new account will be create.
+    ///
     /// Otherwise import the existing account.
     pub fn create(mut self) -> Result<Telegraph> {
         if self.access_token.is_none() {
@@ -123,7 +130,9 @@ pub struct Telegraph {
 
 impl Telegraph {
     /// Use this method to create a new Telegraph account or import an existing one.
+    ///
     /// Most users only need one account, but this can be useful for channel administrators who would like to keep individual author names and profile links for each of their channels.
+    ///
     /// On success, returns an Account object with the regular fields and an additional access_token field.
     ///
     /// ```
@@ -191,7 +200,9 @@ impl Telegraph {
     }
 
     /// Use this method to update information about a Telegraph account.
+    ///
     /// Pass only the parameters that you want to edit.
+    ///
     /// On success, returns an Account object with the default fields.
     pub fn edit_account_info(self) -> AccountBuilder {
         AccountBuilder {
@@ -202,6 +213,9 @@ impl Telegraph {
         }
     }
 
+    /// Use this method to edit an existing Telegraph page.
+    ///
+    /// On success, returns a Page object.
     pub fn edit_page(
         &self,
         path: &str,
@@ -249,6 +263,7 @@ impl Telegraph {
     }
 
     /// Use this method to get a list of pages belonging to a Telegraph account.
+    ///
     /// Returns a PageList object, sorted by most recently created pages first.
     ///
     /// - `offset` Sequential number of the first page to be returned. (suggest: 0)
@@ -267,7 +282,9 @@ impl Telegraph {
     }
 
     /// Use this method to get the number of views for a Telegraph article.
+    ///
     /// Returns a PageViews object on success.
+    ///
     /// By default, the total number of page views will be returned.
     ///
     /// ```rust
@@ -288,8 +305,11 @@ impl Telegraph {
     }
 
     /// Use this method to revoke access_token and generate a new one,
+    ///
     /// for example, if the user would like to reset all connected sessions,
+    ///
     /// or you have reasons to believe the token was compromised.
+    ///
     /// On success, returns an Account object with new access_token and auth_url fields.
     pub fn revoke_access_token(&mut self) -> Result<Account> {
         let mut response = self
@@ -308,6 +328,21 @@ impl Telegraph {
                 .to_owned();
         }
         json
+    }
+
+    /// Upload files to telegraph
+    pub fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
+        let mut form = Form::new();
+        for (idx, file) in files.into_iter().enumerate() {
+            let part = Part::file(file)?;
+            form = form.part(idx.to_string(), part);
+        }
+        let mut response = Client::new()
+            .post("https://telegra.ph/upload")
+            .multipart(form)
+            .send()?;
+
+        Ok(response.json::<Vec<UploadResult>>()?)
     }
 }
 
@@ -398,5 +433,12 @@ mod tests {
         let views = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]);
         println!("{:?}", views);
         assert!(views.is_ok());
+    }
+
+    #[ignore]
+    #[test]
+    fn upload() {
+        let images = Telegraph::upload(&vec!["1.jpeg", "2.jpeg"]);
+        println!("{:?}", images);
     }
 }

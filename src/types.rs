@@ -11,11 +11,10 @@ pub struct Account {
     pub page_count: Option<i32>,
 }
 
-// FIXME: HashMap
 #[derive(Debug, Clone, Deserialize)]
 pub struct PageList {
-    total_count: i32,
-    pages: Vec<Page>,
+    pub total_count: i32,
+    pub pages: Vec<Page>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -34,7 +33,7 @@ pub struct Page {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PageViews {
-    views: i32,
+    pub views: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -49,4 +48,9 @@ pub struct NodeElement {
     pub tag: String,
     pub attrs: Option<HashMap<String, String>>,
     pub children: Option<Vec<Node>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UploadResult {
+    pub src: String
 }
