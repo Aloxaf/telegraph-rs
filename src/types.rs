@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// This object represents a Telegraph account.
@@ -74,7 +74,7 @@ pub struct PageViews {
 /// This abstract object represents a DOM Node.
 ///
 /// It can be a String which represents a DOM text node or a NodeElement object.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Node {
     Text(String),
@@ -82,7 +82,7 @@ pub enum Node {
 }
 
 /// This object represents a DOM element node.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NodeElement {
     /// Name of the DOM element.
     /// Available tags: a, aside, b, blockquote, br, code, em, figcaption, figure, h3, h4, hr, i, iframe, img, li, ol, p, pre, s, strong, u, ul, video.

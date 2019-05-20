@@ -10,10 +10,9 @@ see https://telegra.ph/api for more information
 ## Examples
 
 ```rust
-use telegraph_rs::Telegraph;
+use telegraph_rs::{Telegraph, html_to_node};
 
 let telegraph = Telegraph::new("test_account").create().unwrap();
 
-let page = telegraph.create_page("title", "content", false).unwrap();
+let page = telegraph.create_page("title", &html_to_node("<p>Hello, world</p>"), false).unwrap();
 ```
-

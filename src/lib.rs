@@ -5,11 +5,11 @@
 //! # Examples
 //!
 //! ```
-//! use telegraph_rs::Telegraph;
+//! use telegraph_rs::{Telegraph, html_to_node};
 //!
 //! let telegraph = Telegraph::new("test_account").create().unwrap();
 //!
-//! let page = telegraph.create_page("title", "content", false).unwrap();
+//! let page = telegraph.create_page("title", &html_to_node("<p>Hello, world</p>"), false).unwrap();
 //! ```
 //!
 pub mod error;
@@ -20,6 +20,10 @@ pub use types::*;
 
 use std::{collections::HashMap, path::Path};
 
+use libxml::{
+    parser::Parser,
+    tree::{self, NodeType},
+};
 use reqwest::{
     multipart::{Form, Part},
     Client,
@@ -177,14 +181,14 @@ impl Telegraph {
     /// if `return_content` is true, a content field will be returned in the Page object.
     ///
     /// ```
-    /// use telegraph_rs::Telegraph;
+    /// use telegraph_rs::{Telegraph, html_to_node};
     ///
     /// let telegraph = Telegraph::new("author")
     ///     .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
     ///     .create()
     ///     .unwrap();
     ///
-    /// let page = telegraph.create_page("title", r#"[{"tag":"p","children":["Hello, world!"]}]"#, false);
+    /// let page = telegraph.create_page("title", &html_to_node("<p>Hello, world!</p>"), false);
     /// ```
     pub fn create_page(&self, title: &str, content: &str, return_content: bool) -> Result<Page> {
         // TODO: content HTML 形式
@@ -351,9 +355,68 @@ impl Telegraph {
     }
 }
 
+/// Parse html to node string
+///
+/// ```rust
+/// use telegraph_rs::html_to_node;
+///
+/// let node = html_to_node("<p>Hello, world</p>");
+/// assert_eq!(node, r#"[{"tag":"p","attrs":null,"children":["Hello, world"]}]"#);
+/// ```
+pub fn html_to_node(html: &str) -> String {
+    let parser = Parser::default_html();
+    let document = parser.parse_string(html).unwrap();
+    let node = document
+        .get_root_element()
+        .unwrap()
+        .get_first_element_child()
+        .unwrap();
+    let nodes = node
+        .get_child_nodes()
+        .into_iter()
+        .map(|node| html_to_node_inner(&node))
+        .collect::<Vec<_>>();
+    serde_json::to_string(&nodes).unwrap()
+}
+
+fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
+    match node.get_type() {
+        Some(NodeType::TextNode) => Some(Node::Text(node.get_content())),
+        Some(NodeType::ElementNode) => Some(Node::NodeElement(NodeElement {
+            tag: node.get_name(),
+            attrs: {
+                let attrs = node.get_attributes();
+                if attrs.len() == 0 {
+                    None
+                } else {
+                    Some(attrs)
+                }
+            },
+            children: {
+                let childs = node.get_child_nodes();
+                if childs.len() == 0 {
+                    None
+                } else {
+                    childs
+                        .into_iter()
+                        .map(|node| html_to_node_inner(&node))
+                        .collect::<Option<Vec<_>>>()
+                }
+            },
+        })),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Telegraph;
+
+    #[test]
+    fn html_to_node() {
+        let html = r#"<a>Text</a><p>img:<img src="https://me"></p>"#;
+        println!("{}", super::html_to_node(html));
+    }
 
     #[test]
     fn create_and_revoke_account() {
