@@ -386,7 +386,7 @@ fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
             tag: node.get_name(),
             attrs: {
                 let attrs = node.get_attributes();
-                if attrs.len() == 0 {
+                if attrs.is_empty() {
                     None
                 } else {
                     Some(attrs)
@@ -394,7 +394,7 @@ fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
             },
             children: {
                 let childs = node.get_child_nodes();
-                if childs.len() == 0 {
+                if childs.is_empty() {
                     None
                 } else {
                     childs
