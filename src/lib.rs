@@ -156,17 +156,21 @@ impl Telegraph {
         }
     }
 
-    pub(crate) fn create_account(
+    pub(crate) fn create_account<'a, S, T>(
         short_name: &str,
-        author_name: Option<&str>,
-        author_url: Option<&str>,
-    ) -> Result<Account> {
+        author_name: S,
+        author_url: T,
+    ) -> Result<Account>
+    where
+        T: Into<Option<&'a str>>,
+        S: Into<Option<&'a str>>,
+    {
         let mut params = HashMap::new();
         params.insert("short_name", short_name);
-        if let Some(author_name) = author_name {
+        if let Some(author_name) = author_name.into() {
             params.insert("author_name", author_name);
         }
-        if let Some(author_url) = author_url {
+        if let Some(author_url) = author_url.into() {
             params.insert("author_url", author_url);
         }
         let mut response = Client::new()
@@ -199,6 +203,10 @@ impl Telegraph {
                 ("access_token", &*self.access_token),
                 ("title", title),
                 ("author_name", &*self.author_name),
+                (
+                    "author_url",
+                    self.author_url.as_ref().map(|s| &**s).unwrap_or(""),
+                ),
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
@@ -238,6 +246,10 @@ impl Telegraph {
                 ("path", path),
                 ("title", title),
                 ("author_name", &*self.author_name),
+                (
+                    "author_url",
+                    self.author_url.as_ref().map(|s| &**s).unwrap_or(""),
+                ),
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
@@ -420,7 +432,7 @@ mod tests {
 
     #[test]
     fn create_and_revoke_account() {
-        let result = Telegraph::create_account("sample", Some("a"), None);
+        let result = Telegraph::create_account("sample", "a", None);
         println!("{:?}", result);
         assert!(result.is_ok());
 
