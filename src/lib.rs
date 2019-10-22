@@ -91,15 +91,15 @@ impl AccountBuilder {
                 self.author_url.as_ref().map(|s| &**s),
             )
             .await?;
-            self.access_token = Some(account.access_token.unwrap().to_owned());
+            self.access_token = Some(account.access_token.unwrap());
         }
 
         Ok(Telegraph {
             client: Client::new(),
-            access_token: self.access_token.unwrap().to_owned(),
+            access_token: self.access_token.unwrap(),
             short_name: self.short_name.to_owned(),
-            author_name: self.author_name.unwrap_or(self.short_name.to_owned()),
-            author_url: self.author_url.clone(),
+            author_name: self.author_name.unwrap_or(self.short_name),
+            author_url: self.author_url,
         })
     }
 
@@ -123,10 +123,10 @@ impl AccountBuilder {
 
         Ok(Telegraph {
             client: Client::new(),
-            access_token: self.access_token.clone().unwrap(),
+            access_token: self.access_token.unwrap(),
             short_name: json.short_name.clone().unwrap(),
-            author_name: json.author_name.unwrap_or(json.short_name.clone().unwrap()),
-            author_url: json.author_url.clone(),
+            author_name: json.author_name.or(json.short_name).unwrap(),
+            author_url: json.author_url,
         })
     }
 }
@@ -240,10 +240,10 @@ impl Telegraph {
     /// On success, returns an Account object with the default fields.
     pub fn edit_account_info(self) -> AccountBuilder {
         AccountBuilder {
-            access_token: Some(self.access_token.clone()),
-            short_name: self.short_name.clone(),
-            author_name: Some(self.author_name.clone()),
-            author_url: self.author_url.clone(),
+            access_token: Some(self.access_token),
+            short_name: self.short_name,
+            author_name: Some(self.author_name),
+            author_url: self.author_url,
         }
     }
 
@@ -383,7 +383,7 @@ impl Telegraph {
     #[cfg(feature = "upload")]
     pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
         let mut form = Form::new();
-        for (idx, name) in files.into_iter().enumerate() {
+        for (idx, name) in files.iter().enumerate() {
             let bytes = read_to_bytes(name)?;
             let part = Part::bytes(bytes)
                 .file_name(idx.to_string())
@@ -533,12 +533,13 @@ mod tests {
             .create()
             .await
             .unwrap();
-        let page = telegraph.create_page(
-            "OVO",
-            r#"[{"tag":"p","children":["Hello,+world!"]}]"#,
-            false,
-        )
-        .await;
+        let page = telegraph
+            .create_page(
+                "OVO",
+                r#"[{"tag":"p","children":["Hello,+world!"]}]"#,
+                false,
+            )
+            .await;
         println!("{:?}", page);
         assert!(page.is_ok());
 
@@ -546,13 +547,14 @@ mod tests {
         println!("{:?}", page);
         assert!(page.is_ok());
 
-        let page = telegraph.edit_page(
-            &page.unwrap().path,
-            "QAQ",
-            r#"[{"tag":"p","children":["Goodbye,+world!"]}]"#,
-            false,
-        )
-        .await;
+        let page = telegraph
+            .edit_page(
+                &page.unwrap().path,
+                "QAQ",
+                r#"[{"tag":"p","children":["Goodbye,+world!"]}]"#,
+                false,
+            )
+            .await;
         println!("{:?}", page);
         assert!(page.is_ok());
     }

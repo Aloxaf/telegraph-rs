@@ -81,21 +81,21 @@ impl AccountBuilder {
                 self.author_name.as_ref().map(|s| &**s),
                 self.author_url.as_ref().map(|s| &**s),
             )?;
-            self.access_token = Some(account.access_token.unwrap().to_owned());
+            self.access_token = Some(account.access_token.unwrap());
         }
 
         Ok(Telegraph {
             client: Client::new(),
-            access_token: self.access_token.unwrap().to_owned(),
+            access_token: self.access_token.unwrap(),
             short_name: self.short_name.to_owned(),
-            author_name: self.author_name.unwrap_or(self.short_name.to_owned()),
-            author_url: self.author_url.clone(),
+            author_name: self.author_name.unwrap_or(self.short_name),
+            author_url: self.author_url,
         })
     }
 
     /// Edit info of an an existing account.
     pub fn edit(self) -> Result<Telegraph> {
-        let mut response = Client::new()
+        let response = Client::new()
             .get("https://api.telegra.ph/editAccountInfo")
             .query(&[
                 ("access_token", self.access_token.as_ref().unwrap()),
@@ -112,10 +112,10 @@ impl AccountBuilder {
 
         Ok(Telegraph {
             client: Client::new(),
-            access_token: self.access_token.clone().unwrap(),
+            access_token: self.access_token.unwrap(),
             short_name: json.short_name.clone().unwrap(),
-            author_name: json.author_name.unwrap_or(json.short_name.clone().unwrap()),
-            author_url: json.author_url.clone(),
+            author_name: json.author_name.or(json.short_name).unwrap(),
+            author_url: json.author_url,
         })
     }
 }
@@ -167,7 +167,7 @@ impl Telegraph {
         if let Some(author_url) = author_url.into() {
             params.insert("author_url", author_url);
         }
-        let mut response = Client::new()
+        let response = Client::new()
             .get("https://api.telegra.ph/createAccount")
             .query(&params)
             .send()?;
@@ -191,7 +191,7 @@ impl Telegraph {
     /// ```
     pub fn create_page(&self, title: &str, content: &str, return_content: bool) -> Result<Page> {
         // TODO: content HTML 形式
-        let mut response = self
+        let response = self
             .client
             .post("https://api.telegra.ph/createPage")
             .form(&[
@@ -216,10 +216,10 @@ impl Telegraph {
     /// On success, returns an Account object with the default fields.
     pub fn edit_account_info(self) -> AccountBuilder {
         AccountBuilder {
-            access_token: Some(self.access_token.clone()),
-            short_name: self.short_name.clone(),
-            author_name: Some(self.author_name.clone()),
-            author_url: self.author_url.clone(),
+            access_token: Some(self.access_token),
+            short_name: self.short_name,
+            author_name: Some(self.author_name),
+            author_url: self.author_url,
         }
     }
 
@@ -233,7 +233,7 @@ impl Telegraph {
         content: &str,
         return_content: bool,
     ) -> Result<Page> {
-        let mut response = self
+        let response = self
             .client
             .post("https://api.telegra.ph/editPage")
             .form(&[
@@ -256,7 +256,7 @@ impl Telegraph {
     ///
     /// Available fields: short_name, author_name, author_url, auth_url, page_count.
     pub fn get_account_info(&self, fields: &[&str]) -> Result<Account> {
-        let mut response = self
+        let response = self
             .client
             .get("https://api.telegra.ph/getAccountInfo")
             .query(&[
@@ -269,7 +269,7 @@ impl Telegraph {
 
     /// Use this method to get a Telegraph page. Returns a Page object on success.
     pub fn get_page(path: &str, return_content: bool) -> Result<Page> {
-        let mut response = Client::new()
+        let response = Client::new()
             .get(&format!("https://api.telegra.ph/getPage/{}", path))
             .query(&[("return_content", return_content.to_string())])
             .send()?;
@@ -283,7 +283,7 @@ impl Telegraph {
     /// - `offset` Sequential number of the first page to be returned. (suggest: 0)
     /// - `limit` Limits the number of pages to be retrieved. (suggest: 50)
     pub fn get_page_list(&self, offset: i32, limit: i32) -> Result<PageList> {
-        let mut response = self
+        let response = self
             .client
             .get("https://api.telegra.ph/getPageList")
             .query(&[
@@ -313,7 +313,7 @@ impl Telegraph {
             .zip(time)
             .collect::<HashMap<_, _>>();
 
-        let mut response = Client::new()
+        let response = Client::new()
             .get(&format!("https://api.telegra.ph/getViews/{}", path))
             .query(&params)
             .send()?;
@@ -328,7 +328,7 @@ impl Telegraph {
     ///
     /// On success, returns an Account object with new access_token and auth_url fields.
     pub fn revoke_access_token(&mut self) -> Result<Account> {
-        let mut response = self
+        let response = self
             .client
             .get("https://api.telegra.ph/revokeAccessToken")
             .query(&[("access_token", &self.access_token)])
@@ -349,11 +349,11 @@ impl Telegraph {
     /// Upload files to telegraph
     pub fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
         let mut form = Form::new();
-        for (idx, file) in files.into_iter().enumerate() {
+        for (idx, file) in files.iter().enumerate() {
             let part = Part::file(file)?;
             form = form.part(idx.to_string(), part);
         }
-        let mut response = Client::new()
+        let response = Client::new()
             .post("https://telegra.ph/upload")
             .multipart(form)
             .send()?;
@@ -453,8 +453,10 @@ mod tests {
 
     #[ignore]
     #[test]
+    #[cfg(feature = "upload")]
     fn upload() {
         let images = Telegraph::upload(&vec!["1.jpeg", "2.jpeg"]);
         println!("{:?}", images);
+        assert!(images.is_ok());
     }
 }
