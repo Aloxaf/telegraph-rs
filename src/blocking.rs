@@ -5,32 +5,23 @@
 //! # Examples
 //!
 //! ```
-//! # async fn run() -> Result<(), telegraph_rs::Error> {
-//! use telegraph_rs::{Telegraph, html_to_node};
+//! use telegraph_rs::html_to_node;
+//! use telegraph_rs::blocking::Telegraph;
 //!
-//! let telegraph = Telegraph::new("test_account").create().await?;
+//! let telegraph = Telegraph::new("test_account").create().unwrap();
 //!
-//! let page = telegraph.create_page("title", &html_to_node("<p>Hello, world</p>"), false).await?;
-//! # Ok(())
-//! # }
+//! let page = telegraph.create_page("title", &html_to_node("<p>Hello, world</p>"), false).unwrap();
 //! ```
-#[cfg(feature = "blocking")]
-pub mod blocking;
-pub mod error;
-pub mod types;
+//!
 
-pub use error::*;
-pub use types::*;
+pub use crate::{error::*, types::*};
 
-use libxml::{
-    parser::Parser,
-    tree::{self, NodeType},
-};
-use reqwest::{
+use std::{collections::HashMap, path::Path};
+
+use reqwest::blocking::{
     multipart::{Form, Part},
     Client,
 };
-use std::{collections::HashMap, fs::File, io::Read, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -83,14 +74,13 @@ impl AccountBuilder {
     /// If `access_token` is not set, an new account will be create.
     ///
     /// Otherwise import the existing account.
-    pub async fn create(mut self) -> Result<Telegraph> {
+    pub fn create(mut self) -> Result<Telegraph> {
         if self.access_token.is_none() {
             let account = Telegraph::create_account(
                 &self.short_name,
                 self.author_name.as_ref().map(|s| &**s),
                 self.author_url.as_ref().map(|s| &**s),
-            )
-            .await?;
+            )?;
             self.access_token = Some(account.access_token.unwrap().to_owned());
         }
 
@@ -104,8 +94,8 @@ impl AccountBuilder {
     }
 
     /// Edit info of an an existing account.
-    pub async fn edit(self) -> Result<Telegraph> {
-        let response = Client::new()
+    pub fn edit(self) -> Result<Telegraph> {
+        let mut response = Client::new()
             .get("https://api.telegra.ph/editAccountInfo")
             .query(&[
                 ("access_token", self.access_token.as_ref().unwrap()),
@@ -116,9 +106,8 @@ impl AccountBuilder {
                     self.author_url.as_ref().unwrap_or(&String::new()),
                 ),
             ])
-            .send()
-            .await?;
-        let json: Result<Account> = response.json::<ApiResult<Account>>().await?.into();
+            .send()?;
+        let json: Result<Account> = response.json::<ApiResult<Account>>()?.into();
         let json = json?;
 
         Ok(Telegraph {
@@ -148,15 +137,11 @@ impl Telegraph {
     /// On success, returns an Account object with the regular fields and an additional access_token field.
     ///
     /// ```
-    /// # async fn run() -> Result<(), telegraph_rs::Error> {
-    /// use telegraph_rs::Telegraph;
+    /// use telegraph_rs::blocking::Telegraph;
     ///
     /// let account = Telegraph::new("short_name")
     ///     .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
-    ///     .create()
-    ///     .await?;
-    /// # Ok(())
-    /// # }
+    ///     .create();
     /// ```
     pub fn new(short_name: &str) -> AccountBuilder {
         AccountBuilder {
@@ -165,7 +150,7 @@ impl Telegraph {
         }
     }
 
-    pub(crate) async fn create_account<'a, S, T>(
+    pub(crate) fn create_account<'a, S, T>(
         short_name: &str,
         author_name: S,
         author_url: T,
@@ -182,12 +167,11 @@ impl Telegraph {
         if let Some(author_url) = author_url.into() {
             params.insert("author_url", author_url);
         }
-        let response = Client::new()
+        let mut response = Client::new()
             .get("https://api.telegra.ph/createAccount")
             .query(&params)
-            .send()
-            .await?;
-        response.json::<ApiResult<Account>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<Account>>()?.into()
     }
 
     /// Use this method to create a new Telegraph page. On success, returns a Page object.
@@ -195,26 +179,19 @@ impl Telegraph {
     /// if `return_content` is true, a content field will be returned in the Page object.
     ///
     /// ```
-    /// # async fn test() -> Result<(), telegraph_rs::Error> {
-    /// use telegraph_rs::{Telegraph, html_to_node};
+    /// use telegraph_rs::blocking::Telegraph;
+    /// use telegraph_rs::html_to_node;
     ///
     /// let telegraph = Telegraph::new("author")
     ///     .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
     ///     .create()
-    ///     .await?;
+    ///     .unwrap();
     ///
-    /// let page = telegraph.create_page("title", &html_to_node("<p>Hello, world!</p>"), false).await?;
-    /// # Ok(())
-    /// # }
+    /// let page = telegraph.create_page("title", &html_to_node("<p>Hello, world!</p>"), false);
     /// ```
-    pub async fn create_page(
-        &self,
-        title: &str,
-        content: &str,
-        return_content: bool,
-    ) -> Result<Page> {
+    pub fn create_page(&self, title: &str, content: &str, return_content: bool) -> Result<Page> {
         // TODO: content HTML 形式
-        let response = self
+        let mut response = self
             .client
             .post("https://api.telegra.ph/createPage")
             .form(&[
@@ -228,9 +205,8 @@ impl Telegraph {
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
-            .send()
-            .await?;
-        response.json::<ApiResult<Page>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<Page>>()?.into()
     }
 
     /// Use this method to update information about a Telegraph account.
@@ -250,14 +226,14 @@ impl Telegraph {
     /// Use this method to edit an existing Telegraph page.
     ///
     /// On success, returns a Page object.
-    pub async fn edit_page(
+    pub fn edit_page(
         &self,
         path: &str,
         title: &str,
         content: &str,
         return_content: bool,
     ) -> Result<Page> {
-        let response = self
+        let mut response = self
             .client
             .post("https://api.telegra.ph/editPage")
             .form(&[
@@ -272,35 +248,32 @@ impl Telegraph {
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
-            .send()
-            .await?;
-        response.json::<ApiResult<Page>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<Page>>()?.into()
     }
 
     /// Use this method to get information about a Telegraph account. Returns an Account object on success.
     ///
     /// Available fields: short_name, author_name, author_url, auth_url, page_count.
-    pub async fn get_account_info(&self, fields: &[&str]) -> Result<Account> {
-        let response = self
+    pub fn get_account_info(&self, fields: &[&str]) -> Result<Account> {
+        let mut response = self
             .client
             .get("https://api.telegra.ph/getAccountInfo")
             .query(&[
                 ("access_token", &self.access_token),
                 ("fields", &serde_json::to_string(fields).unwrap()),
             ])
-            .send()
-            .await?;
-        response.json::<ApiResult<Account>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<Account>>()?.into()
     }
 
     /// Use this method to get a Telegraph page. Returns a Page object on success.
-    pub async fn get_page(path: &str, return_content: bool) -> Result<Page> {
-        let response = Client::new()
+    pub fn get_page(path: &str, return_content: bool) -> Result<Page> {
+        let mut response = Client::new()
             .get(&format!("https://api.telegra.ph/getPage/{}", path))
             .query(&[("return_content", return_content.to_string())])
-            .send()
-            .await?;
-        response.json::<ApiResult<Page>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<Page>>()?.into()
     }
 
     /// Use this method to get a list of pages belonging to a Telegraph account.
@@ -309,8 +282,8 @@ impl Telegraph {
     ///
     /// - `offset` Sequential number of the first page to be returned. (suggest: 0)
     /// - `limit` Limits the number of pages to be retrieved. (suggest: 50)
-    pub async fn get_page_list(&self, offset: i32, limit: i32) -> Result<PageList> {
-        let response = self
+    pub fn get_page_list(&self, offset: i32, limit: i32) -> Result<PageList> {
+        let mut response = self
             .client
             .get("https://api.telegra.ph/getPageList")
             .query(&[
@@ -318,9 +291,8 @@ impl Telegraph {
                 ("offset", &offset.to_string()),
                 ("limit", &limit.to_string()),
             ])
-            .send()
-            .await?;
-        response.json::<ApiResult<PageList>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<PageList>>()?.into()
     }
 
     /// Use this method to get the number of views for a Telegraph article.
@@ -330,26 +302,22 @@ impl Telegraph {
     /// By default, the total number of page views will be returned.
     ///
     /// ```rust
-    /// # async fn run() -> Result<(), telegraph_rs::Error> {
-    /// use telegraph_rs::Telegraph;
+    /// use telegraph_rs::blocking::Telegraph;
     ///
-    /// let view1 = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]).await?;
-    /// let view2 = Telegraph::get_views("Sample-Page-12-15", &vec![2019, 5, 19, 12]).await?; // year-month-day-hour
-    /// # Ok(())
-    /// # }
+    /// let view1 = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]);
+    /// let view2 = Telegraph::get_views("Sample-Page-12-15", &vec![2019, 5, 19, 12]); // year-month-day-hour
     /// ```
-    pub async fn get_views(path: &str, time: &[i32]) -> Result<PageViews> {
+    pub fn get_views(path: &str, time: &[i32]) -> Result<PageViews> {
         let params = ["year", "month", "day", "hour"]
             .iter()
             .zip(time)
             .collect::<HashMap<_, _>>();
 
-        let response = Client::new()
+        let mut response = Client::new()
             .get(&format!("https://api.telegra.ph/getViews/{}", path))
             .query(&params)
-            .send()
-            .await?;
-        response.json::<ApiResult<PageViews>>().await?.into()
+            .send()?;
+        response.json::<ApiResult<PageViews>>()?.into()
     }
 
     /// Use this method to revoke access_token and generate a new one,
@@ -359,14 +327,13 @@ impl Telegraph {
     /// or you have reasons to believe the token was compromised.
     ///
     /// On success, returns an Account object with new access_token and auth_url fields.
-    pub async fn revoke_access_token(&mut self) -> Result<Account> {
-        let response = self
+    pub fn revoke_access_token(&mut self) -> Result<Account> {
+        let mut response = self
             .client
             .get("https://api.telegra.ph/revokeAccessToken")
             .query(&[("access_token", &self.access_token)])
-            .send()
-            .await?;
-        let json: Result<Account> = response.json::<ApiResult<Account>>().await?.into();
+            .send()?;
+        let json: Result<Account> = response.json::<ApiResult<Account>>()?.into();
         if json.is_ok() {
             self.access_token = json
                 .as_ref()
@@ -380,169 +347,79 @@ impl Telegraph {
     }
 
     /// Upload files to telegraph
-    #[cfg(feature = "upload")]
-    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
+    pub fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
         let mut form = Form::new();
-        for (idx, name) in files.into_iter().enumerate() {
-            let bytes = read_to_bytes(name)?;
-            let part = Part::bytes(bytes)
-                .file_name(idx.to_string())
-                .mime_str(&guess_mime(name))?;
+        for (idx, file) in files.into_iter().enumerate() {
+            let part = Part::file(file)?;
             form = form.part(idx.to_string(), part);
         }
-        let response = Client::new()
+        let mut response = Client::new()
             .post("https://telegra.ph/upload")
             .multipart(form)
-            .send()
-            .await?;
+            .send()?;
 
-        Ok(response.json::<Vec<UploadResult>>().await?)
-    }
-}
-
-#[cfg(feature = "upload")]
-fn guess_mime<P: AsRef<Path>>(path: P) -> String {
-    let mime = mime_guess::from_path(path).first_or(mime_guess::mime::TEXT_PLAIN);
-    let mut s = format!("{}/{}", mime.type_(), mime.subtype());
-    if let Some(suffix) = mime.suffix() {
-        s.push('+');
-        s.push_str(suffix.as_str());
-    }
-    s
-}
-
-#[cfg(feature = "upload")]
-fn read_to_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
-    let mut bytes = vec![];
-    let mut file = File::open(path)?;
-    file.read_to_end(&mut bytes)?;
-    Ok(bytes)
-}
-
-/// Parse html to node string
-///
-/// ```rust
-/// use telegraph_rs::html_to_node;
-///
-/// let node = html_to_node("<p>Hello, world</p>");
-/// assert_eq!(node, r#"[{"tag":"p","attrs":null,"children":["Hello, world"]}]"#);
-/// ```
-pub fn html_to_node(html: &str) -> String {
-    let parser = Parser::default_html();
-    let document = parser.parse_string(html).unwrap();
-    let node = document
-        .get_root_element()
-        .unwrap()
-        .get_first_element_child()
-        .unwrap();
-    let nodes = node
-        .get_child_nodes()
-        .into_iter()
-        .map(|node| html_to_node_inner(&node))
-        .collect::<Vec<_>>();
-    serde_json::to_string(&nodes).unwrap()
-}
-
-fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
-    match node.get_type() {
-        Some(NodeType::TextNode) => Some(Node::Text(node.get_content())),
-        Some(NodeType::ElementNode) => Some(Node::NodeElement(NodeElement {
-            tag: node.get_name(),
-            attrs: {
-                let attrs = node.get_attributes();
-                if attrs.is_empty() {
-                    None
-                } else {
-                    Some(attrs)
-                }
-            },
-            children: {
-                let childs = node.get_child_nodes();
-                if childs.is_empty() {
-                    None
-                } else {
-                    childs
-                        .into_iter()
-                        .map(|node| html_to_node_inner(&node))
-                        .collect::<Option<Vec<_>>>()
-                }
-            },
-        })),
-        _ => None,
+        Ok(response.json::<Vec<UploadResult>>()?)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::Telegraph;
+    use crate::blocking::Telegraph;
 
     #[test]
-    fn html_to_node() {
-        let html = r#"<a>Text</a><p>img:<img src="https://me"></p>"#;
-        println!("{}", super::html_to_node(html));
-    }
-
-    #[tokio::test]
-    async fn create_and_revoke_account() {
-        let result = Telegraph::create_account("sample", "a", None).await;
+    fn create_and_revoke_account() {
+        let result = Telegraph::create_account("sample", "a", None);
         println!("{:?}", result);
         assert!(result.is_ok());
 
         let mut telegraph = Telegraph::new("test")
             .access_token(&result.unwrap().access_token.unwrap().to_owned())
             .create()
-            .await
             .unwrap();
-        let result = telegraph.revoke_access_token().await;
+        let result = telegraph.revoke_access_token();
         println!("{:?}", result);
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn edit_account_info() {
+    #[test]
+    fn edit_account_info() {
         let result = Telegraph::new("test")
             .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
             .create()
-            .await
             .unwrap()
             .edit_account_info()
             .short_name("wow")
-            .edit()
-            .await;
+            .edit();
         println!("{:?}", result);
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn get_account_info() {
+    #[test]
+    fn get_account_info() {
         let result = Telegraph::new("test")
             .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
             .create()
-            .await
             .unwrap()
-            .get_account_info(&["short_name"])
-            .await;
+            .get_account_info(&["short_name"]);
         println!("{:?}", result);
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn create_get_edit_page() {
+    #[test]
+    fn create_get_edit_page() {
         let telegraph = Telegraph::new("test")
             .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
             .create()
-            .await
             .unwrap();
         let page = telegraph.create_page(
             "OVO",
             r#"[{"tag":"p","children":["Hello,+world!"]}]"#,
             false,
-        )
-        .await;
+        );
         println!("{:?}", page);
         assert!(page.is_ok());
 
-        let page = Telegraph::get_page(&page.unwrap().path, true).await;
+        let page = Telegraph::get_page(&page.unwrap().path, true);
         println!("{:?}", page);
         assert!(page.is_ok());
 
@@ -551,37 +428,33 @@ mod tests {
             "QAQ",
             r#"[{"tag":"p","children":["Goodbye,+world!"]}]"#,
             false,
-        )
-        .await;
+        );
         println!("{:?}", page);
         assert!(page.is_ok());
     }
 
-    #[tokio::test]
-    async fn get_page_list() {
+    #[test]
+    fn get_page_list() {
         let telegraph = Telegraph::new("test")
             .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
             .create()
-            .await
             .unwrap();
-        let page_list = telegraph.get_page_list(0, 3).await;
+        let page_list = telegraph.get_page_list(0, 3);
         println!("{:?}", page_list);
         assert!(page_list.is_ok());
     }
 
-    #[tokio::test]
-    async fn get_views() {
-        let views = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]).await;
+    #[test]
+    fn get_views() {
+        let views = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]);
         println!("{:?}", views);
         assert!(views.is_ok());
     }
 
     #[ignore]
-    #[tokio::test]
-    #[cfg(feature = "upload")]
-    async fn upload() {
-        let images = Telegraph::upload(&vec!["1.jpeg", "2.jpeg"]).await;
+    #[test]
+    fn upload() {
+        let images = Telegraph::upload(&vec!["1.jpeg", "2.jpeg"]);
         println!("{:?}", images);
-        assert!(images.is_ok());
     }
 }
