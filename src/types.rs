@@ -99,7 +99,14 @@ pub struct NodeElement {
 
 /// This object represents the upload result
 #[derive(Debug, Clone, Deserialize)]
-pub struct UploadResult {
+#[serde(untagged)]
+pub enum UploadResult {
+    Error { error: String },
+    Source(Vec<ImageInfo>),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageInfo {
     /// Path of the file uploaded.
-    pub src: String,
+    src: String,
 }

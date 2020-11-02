@@ -347,7 +347,7 @@ impl Telegraph {
     }
 
     /// Upload files to telegraph
-    pub fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
+    pub fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<ImageInfo>> {
         let mut form = Form::new();
         for (idx, file) in files.iter().enumerate() {
             let part = Part::file(file)?;
@@ -358,7 +358,10 @@ impl Telegraph {
             .multipart(form)
             .send()?;
 
-        Ok(response.json::<Vec<UploadResult>>()?)
+        match response.json::<UploadResult>()? {
+            UploadResult::Error { error } => Err(Error::ApiError(error)),
+            UploadResult::Source(v) => Ok(v),
+        }
     }
 }
 

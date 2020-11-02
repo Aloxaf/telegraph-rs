@@ -1,6 +1,6 @@
 [package]
 name = "telegraph-rs"
-version = "0.4.0"
+version = "0.4.1"
 description = "telegraph binding in Rust"
 authors = ["Aloxaf <aloxafx@gmail.com>"]
 homepage = "https://github.com/Aloxaf/telegraph-rs"
@@ -17,10 +17,10 @@ upload = [ "mime_guess" ]
 
 [dependencies]
 libxml = "0.2.11"
-reqwest = { version = "0.10.0-alpha.1", features = [ "json", "gzip" ]}
+reqwest = { version = "0.10.8", features = [ "json", "gzip" ] }
 serde = { version = "1.0.91", features = [ "derive" ] }
 serde_json = "1.0.39"
 mime_guess = { version = "2.0.1", optional = true }
 
 [dev-dependencies]
-tokio = "=0.2.12"
+tokio = { version = "0.2.22", features = [ "macros", "test-util" ] }

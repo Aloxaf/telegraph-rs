@@ -87,8 +87,8 @@ impl AccountBuilder {
         if self.access_token.is_none() {
             let account = Telegraph::create_account(
                 &self.short_name,
-                self.author_name.as_ref().map(|s| &**s),
-                self.author_url.as_ref().map(|s| &**s),
+                self.author_name.as_deref(),
+                self.author_url.as_deref(),
             )
             .await?;
             self.access_token = Some(account.access_token.unwrap());
@@ -221,10 +221,7 @@ impl Telegraph {
                 ("access_token", &*self.access_token),
                 ("title", title),
                 ("author_name", &*self.author_name),
-                (
-                    "author_url",
-                    self.author_url.as_ref().map(|s| &**s).unwrap_or(""),
-                ),
+                ("author_url", self.author_url.as_deref().unwrap_or("")),
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
@@ -265,10 +262,7 @@ impl Telegraph {
                 ("path", path),
                 ("title", title),
                 ("author_name", &*self.author_name),
-                (
-                    "author_url",
-                    self.author_url.as_ref().map(|s| &**s).unwrap_or(""),
-                ),
+                ("author_url", self.author_url.as_deref().unwrap_or("")),
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
             ])
@@ -381,7 +375,7 @@ impl Telegraph {
 
     /// Upload files to telegraph
     #[cfg(feature = "upload")]
-    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<UploadResult>> {
+    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<ImageInfo>> {
         let mut form = Form::new();
         for (idx, name) in files.iter().enumerate() {
             let bytes = read_to_bytes(name)?;
@@ -396,7 +390,10 @@ impl Telegraph {
             .send()
             .await?;
 
-        Ok(response.json::<Vec<UploadResult>>().await?)
+        match response.json::<UploadResult>().await? {
+            UploadResult::Error { error } => Err(Error::ApiError(error)),
+            UploadResult::Source(v) => Ok(v),
+        }
     }
 }
 
