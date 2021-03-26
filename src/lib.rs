@@ -40,6 +40,7 @@ pub struct AccountBuilder {
     short_name: String,
     author_name: Option<String>,
     author_url: Option<String>,
+    client: Client,
 }
 
 impl AccountBuilder {
@@ -80,6 +81,12 @@ impl AccountBuilder {
         self
     }
 
+    /// Client
+    pub fn client(mut self, client: Client) -> Self {
+        self.client = client;
+        self
+    }
+
     /// If `access_token` is not set, an new account will be create.
     ///
     /// Otherwise import the existing account.
@@ -95,7 +102,7 @@ impl AccountBuilder {
         }
 
         Ok(Telegraph {
-            client: Client::new(),
+            client: self.client,
             access_token: self.access_token.unwrap(),
             short_name: self.short_name.to_owned(),
             author_name: self.author_name.unwrap_or(self.short_name),
@@ -241,6 +248,7 @@ impl Telegraph {
             short_name: self.short_name,
             author_name: Some(self.author_name),
             author_url: self.author_url,
+            client: self.client,
         }
     }
 
@@ -373,9 +381,12 @@ impl Telegraph {
         json
     }
 
-    /// Upload files to telegraph
+    /// Upload files to telegraph with custom client
     #[cfg(feature = "upload")]
-    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<ImageInfo>> {
+    pub async fn upload_with<P: AsRef<Path>>(
+        files: &[P],
+        client: &Client,
+    ) -> Result<Vec<ImageInfo>> {
         let mut form = Form::new();
         for (idx, name) in files.iter().enumerate() {
             let bytes = read_to_bytes(name)?;
@@ -384,7 +395,7 @@ impl Telegraph {
                 .mime_str(&guess_mime(name))?;
             form = form.part(idx.to_string(), part);
         }
-        let response = Client::new()
+        let response = client
             .post("https://telegra.ph/upload")
             .multipart(form)
             .send()
@@ -394,6 +405,12 @@ impl Telegraph {
             UploadResult::Error { error } => Err(Error::ApiError(error)),
             UploadResult::Source(v) => Ok(v),
         }
+    }
+
+    /// Upload files to telegraph
+    #[cfg(feature = "upload")]
+    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<ImageInfo>> {
+        Self::upload_with(files, &Client::new()).await
     }
 }
 
