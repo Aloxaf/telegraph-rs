@@ -28,11 +28,17 @@ use libxml::{
 };
 use reqwest::{
     multipart::{Form, Part},
-    Client,
+    Client, Response,
 };
 use std::{collections::HashMap, fs::File, io::Read, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+macro_rules! send {
+    ($e:expr) => {
+        $e.send().await.and_then(Response::error_for_status)
+    };
+}
 
 #[derive(Debug, Default)]
 pub struct AccountBuilder {
@@ -112,7 +118,7 @@ impl AccountBuilder {
 
     /// Edit info of an an existing account.
     pub async fn edit(self) -> Result<Telegraph> {
-        let response = Client::new()
+        let response = send!(Client::new()
             .get("https://api.telegra.ph/editAccountInfo")
             .query(&[
                 ("access_token", self.access_token.as_ref().unwrap()),
@@ -122,9 +128,7 @@ impl AccountBuilder {
                     "author_url",
                     self.author_url.as_ref().unwrap_or(&String::new()),
                 ),
-            ])
-            .send()
-            .await?;
+            ]))?;
         let json: Result<Account> = response.json::<ApiResult<Account>>().await?.into();
         let json = json?;
 
@@ -189,11 +193,9 @@ impl Telegraph {
         if let Some(author_url) = author_url.into() {
             params.insert("author_url", author_url);
         }
-        let response = Client::new()
+        let response = send!(Client::new()
             .get("https://api.telegra.ph/createAccount")
-            .query(&params)
-            .send()
-            .await?;
+            .query(&params))?;
         response.json::<ApiResult<Account>>().await?.into()
     }
 
@@ -221,7 +223,7 @@ impl Telegraph {
         return_content: bool,
     ) -> Result<Page> {
         // TODO: content HTML 形式
-        let response = self
+        let response = send!(self
             .client
             .post("https://api.telegra.ph/createPage")
             .form(&[
@@ -231,9 +233,7 @@ impl Telegraph {
                 ("author_url", self.author_url.as_deref().unwrap_or("")),
                 ("content", content),
                 ("return_content", &*return_content.to_string()),
-            ])
-            .send()
-            .await?;
+            ]))?;
         response.json::<ApiResult<Page>>().await?.into()
     }
 
@@ -262,20 +262,15 @@ impl Telegraph {
         content: &str,
         return_content: bool,
     ) -> Result<Page> {
-        let response = self
-            .client
-            .post("https://api.telegra.ph/editPage")
-            .form(&[
-                ("access_token", &*self.access_token),
-                ("path", path),
-                ("title", title),
-                ("author_name", &*self.author_name),
-                ("author_url", self.author_url.as_deref().unwrap_or("")),
-                ("content", content),
-                ("return_content", &*return_content.to_string()),
-            ])
-            .send()
-            .await?;
+        let response = send!(self.client.post("https://api.telegra.ph/editPage").form(&[
+            ("access_token", &*self.access_token),
+            ("path", path),
+            ("title", title),
+            ("author_name", &*self.author_name),
+            ("author_url", self.author_url.as_deref().unwrap_or("")),
+            ("content", content),
+            ("return_content", &*return_content.to_string()),
+        ]))?;
         response.json::<ApiResult<Page>>().await?.into()
     }
 
@@ -283,15 +278,13 @@ impl Telegraph {
     ///
     /// Available fields: short_name, author_name, author_url, auth_url, page_count.
     pub async fn get_account_info(&self, fields: &[&str]) -> Result<Account> {
-        let response = self
+        let response = send!(self
             .client
             .get("https://api.telegra.ph/getAccountInfo")
             .query(&[
                 ("access_token", &self.access_token),
                 ("fields", &serde_json::to_string(fields).unwrap()),
-            ])
-            .send()
-            .await?;
+            ]))?;
         response.json::<ApiResult<Account>>().await?.into()
     }
 
@@ -301,7 +294,8 @@ impl Telegraph {
             .get(&format!("https://api.telegra.ph/getPage/{}", path))
             .query(&[("return_content", return_content.to_string())])
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         response.json::<ApiResult<Page>>().await?.into()
     }
 
@@ -312,16 +306,14 @@ impl Telegraph {
     /// - `offset` Sequential number of the first page to be returned. (suggest: 0)
     /// - `limit` Limits the number of pages to be retrieved. (suggest: 50)
     pub async fn get_page_list(&self, offset: i32, limit: i32) -> Result<PageList> {
-        let response = self
+        let response = send!(self
             .client
             .get("https://api.telegra.ph/getPageList")
             .query(&[
                 ("access_token", &self.access_token),
                 ("offset", &offset.to_string()),
                 ("limit", &limit.to_string()),
-            ])
-            .send()
-            .await?;
+            ]))?;
         response.json::<ApiResult<PageList>>().await?.into()
     }
 
@@ -346,11 +338,9 @@ impl Telegraph {
             .zip(time)
             .collect::<HashMap<_, _>>();
 
-        let response = Client::new()
+        let response = send!(Client::new()
             .get(&format!("https://api.telegra.ph/getViews/{}", path))
-            .query(&params)
-            .send()
-            .await?;
+            .query(&params))?;
         response.json::<ApiResult<PageViews>>().await?.into()
     }
 
@@ -362,12 +352,10 @@ impl Telegraph {
     ///
     /// On success, returns an Account object with new access_token and auth_url fields.
     pub async fn revoke_access_token(&mut self) -> Result<Account> {
-        let response = self
+        let response = send!(self
             .client
             .get("https://api.telegra.ph/revokeAccessToken")
-            .query(&[("access_token", &self.access_token)])
-            .send()
-            .await?;
+            .query(&[("access_token", &self.access_token)]))?;
         let json: Result<Account> = response.json::<ApiResult<Account>>().await?.into();
         if json.is_ok() {
             self.access_token = json
@@ -395,19 +383,11 @@ impl Telegraph {
                 .mime_str(&guess_mime(name))?;
             form = form.part(idx.to_string(), part);
         }
-        let response = client
-            .post("https://telegra.ph/upload")
-            .multipart(form)
-            .send()
-            .await?;
-        let full = response.bytes().await?;
+        let response = send!(client.post("https://telegra.ph/upload").multipart(form))?;
 
-        match serde_json::from_slice::<UploadResult>(&full) {
-            Ok(UploadResult::Error { error }) => Err(Error::ApiError(error)),
-            Ok(UploadResult::Source(v)) => Ok(v),
-            Err(e) => {
-                Err(Error::ApiError(format!("{}: {}", e, String::from_utf8_lossy(&full))))
-            }
+        match response.json::<UploadResult>().await? {
+            UploadResult::Error { error } => Err(Error::ApiError(error)),
+            UploadResult::Source(v) => Ok(v),
         }
     }
 
