@@ -400,10 +400,14 @@ impl Telegraph {
             .multipart(form)
             .send()
             .await?;
+        let full = response.bytes().await?;
 
-        match response.json::<UploadResult>().await? {
-            UploadResult::Error { error } => Err(Error::ApiError(error)),
-            UploadResult::Source(v) => Ok(v),
+        match serde_json::from_slice::<UploadResult>(&full) {
+            Ok(UploadResult::Error { error }) => Err(Error::ApiError(error)),
+            Ok(UploadResult::Source(v)) => Ok(v),
+            Err(e) => {
+                Err(Error::ApiError(format!("{}: {}", e, String::from_utf8_lossy(&full))))
+            }
         }
     }
 
