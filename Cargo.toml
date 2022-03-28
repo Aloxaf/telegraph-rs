@@ -16,7 +16,7 @@ blocking = [ "reqwest/blocking" ]
 upload = [ "mime_guess" ]
 
 [dependencies]
-libxml = "0.2.11"
+libxml = "0.3.1"
 reqwest = { version = "0.11.1", features = [ "json", "multipart" ] }
 serde = { version = "1.0.91", features = [ "derive" ] }
 serde_json = "1.0.39"
