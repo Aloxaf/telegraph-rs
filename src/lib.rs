@@ -34,7 +34,7 @@ macro_rules! send {
     };
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AccountBuilder {
     access_token: Option<String>,
     short_name: String,
@@ -136,7 +136,7 @@ impl AccountBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Telegraph {
     client: Client,
     access_token: String,
