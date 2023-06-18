@@ -14,23 +14,17 @@
 //! # Ok(())
 //! # }
 //! ```
-#[cfg(feature = "blocking")]
-pub mod blocking;
 pub mod error;
 pub mod types;
+pub mod utils;
 
 pub use error::*;
 pub use types::*;
+pub use utils::*;
 
-use libxml::{
-    parser::Parser,
-    tree::{self, NodeType},
-};
-use reqwest::{
-    multipart::{Form, Part},
-    Client, Response,
-};
-use std::{collections::HashMap, fs::File, io::Read, path::Path};
+use libxml::tree::{self, NodeType};
+use reqwest::{multipart::Form, Client, Response};
+use std::collections::HashMap;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -371,17 +365,14 @@ impl Telegraph {
 
     /// Upload files to telegraph with custom client
     #[cfg(feature = "upload")]
-    pub async fn upload_with<P: AsRef<Path>>(
-        files: &[P],
+    pub async fn upload_with<T: Uploadable>(
+        files: &[T],
         client: &Client,
     ) -> Result<Vec<ImageInfo>> {
         let mut form = Form::new();
-        for (idx, name) in files.iter().enumerate() {
-            let bytes = read_to_bytes(name)?;
-            let part = Part::bytes(bytes)
-                .file_name(idx.to_string())
-                .mime_str(&guess_mime(name))?;
-            form = form.part(idx.to_string(), part);
+        for (i, file) in files.iter().enumerate() {
+            let part = file.part()?;
+            form = form.part(i.to_string(), part);
         }
         let response = send!(client.post("https://telegra.ph/upload").multipart(form))?;
 
@@ -393,52 +384,9 @@ impl Telegraph {
 
     /// Upload files to telegraph
     #[cfg(feature = "upload")]
-    pub async fn upload<P: AsRef<Path>>(files: &[P]) -> Result<Vec<ImageInfo>> {
+    pub async fn upload<T: Uploadable>(files: &[T]) -> Result<Vec<ImageInfo>> {
         Self::upload_with(files, &Client::new()).await
     }
-}
-
-#[cfg(feature = "upload")]
-fn guess_mime<P: AsRef<Path>>(path: P) -> String {
-    let mime = mime_guess::from_path(path).first_or(mime_guess::mime::TEXT_PLAIN);
-    let mut s = format!("{}/{}", mime.type_(), mime.subtype());
-    if let Some(suffix) = mime.suffix() {
-        s.push('+');
-        s.push_str(suffix.as_str());
-    }
-    s
-}
-
-#[cfg(feature = "upload")]
-fn read_to_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
-    let mut bytes = vec![];
-    let mut file = File::open(path)?;
-    file.read_to_end(&mut bytes)?;
-    Ok(bytes)
-}
-
-/// Parse html to node string
-///
-/// ```rust
-/// use telegraph_rs::html_to_node;
-///
-/// let node = html_to_node("<p>Hello, world</p>");
-/// assert_eq!(node, r#"[{"tag":"p","attrs":null,"children":["Hello, world"]}]"#);
-/// ```
-pub fn html_to_node(html: &str) -> String {
-    let parser = Parser::default_html();
-    let document = parser.parse_string(html).unwrap();
-    let node = document
-        .get_root_element()
-        .unwrap()
-        .get_first_element_child()
-        .unwrap();
-    let nodes = node
-        .get_child_nodes()
-        .into_iter()
-        .map(|node| html_to_node_inner(&node))
-        .collect::<Vec<_>>();
-    serde_json::to_string(&nodes).unwrap()
 }
 
 fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
@@ -499,7 +447,7 @@ mod tests {
     #[tokio::test]
     async fn edit_account_info() {
         let result = Telegraph::new("test")
-            .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
+            .access_token("d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc5ad71e58722")
             .create()
             .await
             .unwrap()
@@ -514,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn get_account_info() {
         let result = Telegraph::new("test")
-            .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
+            .access_token("d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc5ad71e58722")
             .create()
             .await
             .unwrap()
@@ -527,7 +475,7 @@ mod tests {
     #[tokio::test]
     async fn create_get_edit_page() {
         let telegraph = Telegraph::new("test")
-            .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
+            .access_token("d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc5ad71e58722")
             .create()
             .await
             .unwrap();
@@ -560,7 +508,7 @@ mod tests {
     #[tokio::test]
     async fn get_page_list() {
         let telegraph = Telegraph::new("test")
-            .access_token("b968da509bb76866c35425099bc0989a5ec3b32997d55286c657e6994bbb")
+            .access_token("d3b25feccb89e508a9114afb82aa421fe2a9712b963b387cc5ad71e58722")
             .create()
             .await
             .unwrap();
