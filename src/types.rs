@@ -94,7 +94,7 @@ pub struct NodeElement {
     /// Key of object represents name of attribute, value represents value of attribute.
     ///
     /// Available attributes: href, src.
-    pub attrs: Option<HashMap<String, String>>,
+    pub attrs: Option<HashMap<String, Option<String>>>,
     /// Optional. List of child nodes for the DOM element.
     pub children: Option<Vec<Node>>,
 }
@@ -113,10 +113,12 @@ pub struct ImageInfo {
     pub src: String,
 }
 
+#[cfg(feature = "upload")]
 pub trait Uploadable {
     fn part(&self) -> Result<Part, Error>;
 }
 
+#[cfg(feature = "upload")]
 impl<T> Uploadable for T
 where
     T: AsRef<Path>,

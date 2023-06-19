@@ -1,5 +1,4 @@
-use libxml::parser::Parser;
-use std::{fs::File, io::Read, path::Path};
+use std::path::Path;
 
 #[cfg(feature = "upload")]
 pub fn guess_mime<P: AsRef<Path>>(path: P) -> String {
@@ -14,6 +13,7 @@ pub fn guess_mime<P: AsRef<Path>>(path: P) -> String {
 
 #[cfg(feature = "upload")]
 pub fn read_to_bytes<P: AsRef<Path>>(path: P) -> crate::Result<Vec<u8>> {
+    use std::{fs::File, io::Read};
     let mut bytes = vec![];
     let mut file = File::open(path)?;
     file.read_to_end(&mut bytes)?;
@@ -28,16 +28,12 @@ pub fn read_to_bytes<P: AsRef<Path>>(path: P) -> crate::Result<Vec<u8>> {
 /// let node = html_to_node("<p>Hello, world</p>");
 /// assert_eq!(node, r#"[{"tag":"p","attrs":null,"children":["Hello, world"]}]"#);
 /// ```
+#[cfg(feature = "html")]
 pub fn html_to_node(html: &str) -> String {
-    let parser = Parser::default_html();
-    let document = parser.parse_string(html).unwrap();
-    let node = document
-        .get_root_element()
-        .unwrap()
-        .get_first_element_child()
-        .unwrap();
-    let nodes = node
-        .get_child_nodes()
+    use html_parser::Dom;
+
+    let dom = Dom::parse(html).unwrap();
+    let nodes = dom.children
         .into_iter()
         .map(|node| crate::html_to_node_inner(&node))
         .collect::<Vec<_>>();

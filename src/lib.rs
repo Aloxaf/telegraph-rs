@@ -22,7 +22,6 @@ pub use error::*;
 pub use types::*;
 pub use utils::*;
 
-use libxml::tree::{self, NodeType};
 use reqwest::{multipart::Form, Client, Response};
 use std::collections::HashMap;
 
@@ -389,27 +388,20 @@ impl Telegraph {
     }
 }
 
-fn html_to_node_inner(node: &tree::Node) -> Option<Node> {
-    match node.get_type() {
-        Some(NodeType::TextNode) => Some(Node::Text(node.get_content())),
-        Some(NodeType::ElementNode) => Some(Node::NodeElement(NodeElement {
-            tag: node.get_name(),
+#[cfg(feature = "html")]
+fn html_to_node_inner(node: &html_parser::Node) -> Option<Node> {
+    match node {
+        html_parser::Node::Text(text) => Some(Node::Text(text.to_owned())),
+        html_parser::Node::Element(element) => Some(Node::NodeElement(NodeElement {
+            tag: element.name.to_owned(),
             attrs: {
-                let attrs = node.get_attributes();
-                if attrs.is_empty() {
-                    None
-                } else {
-                    Some(attrs)
-                }
+                (!element.attributes.is_empty()).then(|| element.attributes.clone())
             },
             children: {
-                let childs = node.get_child_nodes();
-                if childs.is_empty() {
+                if element.children.is_empty() {
                     None
                 } else {
-                    childs
-                        .into_iter()
-                        .map(|node| html_to_node_inner(&node))
+                    element.children.iter().map(|node| html_to_node_inner(node))
                         .collect::<Option<Vec<_>>>()
                 }
             },
