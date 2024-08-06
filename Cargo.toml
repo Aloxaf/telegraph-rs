@@ -11,17 +11,20 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["upload", "html"]
+default = ["upload", "html", "native-tls"]
 upload = ["mime_guess"]
 html = ["html_parser"]
 
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls-tls"]
+
 [dependencies]
-reqwest = { version = "0.11.18", features = [ "json", "multipart" ] }
-serde = { version = "1.0.164", features = [ "derive" ] }
-serde_json = "1.0.97"
-mime_guess = { version = "2.0.4", optional = true }
-thiserror = "1.0.40"
+reqwest = { version = "0.12.5", default-features=false, features = [ "json", "multipart" ] }
+serde = { version = "1.0.204", features = [ "derive" ] }
+serde_json = "1.0.122"
+mime_guess = { version = "2.0.5", optional = true }
+thiserror = "1.0.63"
 html_parser = { version = "0.7.0", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.28.2", features = [ "macros", "test-util" ] }
+tokio = { version = "1.39.2", features = [ "macros", "test-util" ] }
