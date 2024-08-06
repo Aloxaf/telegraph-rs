@@ -1,6 +1,6 @@
 [package]
 name = "telegraph-rs"
-version = "0.6.2"
+version = "0.6.3"
 description = "telegraph binding for Rust"
 authors = ["Aloxaf <aloxafx@gmail.com>"]
 homepage = "https://github.com/Aloxaf/telegraph-rs"
