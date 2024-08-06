@@ -94,8 +94,10 @@ pub struct NodeElement {
     /// Key of object represents name of attribute, value represents value of attribute.
     ///
     /// Available attributes: href, src.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attrs: Option<HashMap<String, Option<String>>>,
     /// Optional. List of child nodes for the DOM element.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<Node>>,
 }
 
