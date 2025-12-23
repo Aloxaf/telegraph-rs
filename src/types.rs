@@ -1,7 +1,5 @@
-use super::{error::Error, utils::*};
-use reqwest::multipart::Part;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 /// This object represents a Telegraph account.
 #[derive(Debug, Clone, Deserialize)]
@@ -113,24 +111,4 @@ pub enum UploadResult {
 pub struct ImageInfo {
     /// Path of the file uploaded.
     pub src: String,
-}
-
-#[cfg(feature = "upload")]
-pub trait Uploadable {
-    fn part(&self) -> Result<Part, Error>;
-}
-
-#[cfg(feature = "upload")]
-impl<T> Uploadable for T
-where
-    T: AsRef<Path>,
-{
-    fn part(&self) -> Result<Part, Error> {
-        let path = self.as_ref();
-        let bytes = read_to_bytes(path)?;
-        let part = Part::bytes(bytes)
-            .file_name(path.file_name().unwrap().to_string_lossy().to_string())
-            .mime_str(&guess_mime(path))?;
-        Ok(part)
-    }
 }

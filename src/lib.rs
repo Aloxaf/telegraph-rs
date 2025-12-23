@@ -22,7 +22,7 @@ pub use error::*;
 pub use types::*;
 pub use utils::*;
 
-use reqwest::{multipart::Form, Client, Response};
+use reqwest::{Client, Response};
 use std::collections::HashMap;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -361,31 +361,6 @@ impl Telegraph {
         }
         json
     }
-
-    /// Upload files to telegraph with custom client
-    #[cfg(feature = "upload")]
-    pub async fn upload_with<T: Uploadable>(
-        files: &[T],
-        client: &Client,
-    ) -> Result<Vec<ImageInfo>> {
-        let mut form = Form::new();
-        for (i, file) in files.iter().enumerate() {
-            let part = file.part()?;
-            form = form.part(i.to_string(), part);
-        }
-        let response = send!(client.post("https://telegra.ph/upload").multipart(form))?;
-
-        match response.json::<UploadResult>().await? {
-            UploadResult::Error { error } => Err(Error::ApiError(error)),
-            UploadResult::Source(v) => Ok(v),
-        }
-    }
-
-    /// Upload files to telegraph
-    #[cfg(feature = "upload")]
-    pub async fn upload<T: Uploadable>(files: &[T]) -> Result<Vec<ImageInfo>> {
-        Self::upload_with(files, &Client::new()).await
-    }
 }
 
 #[cfg(feature = "html")]
@@ -394,14 +369,15 @@ fn html_to_node_inner(node: &html_parser::Node) -> Option<Node> {
         html_parser::Node::Text(text) => Some(Node::Text(text.to_owned())),
         html_parser::Node::Element(element) => Some(Node::NodeElement(NodeElement {
             tag: element.name.to_owned(),
-            attrs: {
-                (!element.attributes.is_empty()).then(|| element.attributes.clone())
-            },
+            attrs: { (!element.attributes.is_empty()).then(|| element.attributes.clone()) },
             children: {
                 if element.children.is_empty() {
                     None
                 } else {
-                    element.children.iter().map(|node| html_to_node_inner(node))
+                    element
+                        .children
+                        .iter()
+                        .map(|node| html_to_node_inner(node))
                         .collect::<Option<Vec<_>>>()
                 }
             },
@@ -514,14 +490,5 @@ mod tests {
         let views = Telegraph::get_views("Sample-Page-12-15", &vec![2016, 12]).await;
         println!("{:?}", views);
         assert!(views.is_ok());
-    }
-
-    #[ignore]
-    #[tokio::test]
-    #[cfg(feature = "upload")]
-    async fn upload() {
-        let images = Telegraph::upload(&vec!["1.jpeg", "2.jpeg"]).await;
-        println!("{:?}", images);
-        assert!(images.is_ok());
     }
 }
