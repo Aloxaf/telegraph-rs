@@ -14,11 +14,27 @@ see https://telegra.ph/api for more information
 async fn main() {
     use telegraph_rs::{Telegraph, html_to_node};
 
-    let telegraph = Telegraph::new("test_account").create().await.unwrap();
+    let telegraph = Telegraph::new();
+    let account = telegraph.account("test_account").create().await.unwrap();
 
-    let page = telegraph
+    let page = account
         .create_page("title", &html_to_node("<p>Hello, world</p>"), false)
         .await
         .unwrap();
 }
+```
+
+To use a Telegraph-compatible API endpoint, configure the API client once:
+
+```rust
+let telegraph = telegraph_rs::Telegraph::new()
+    .api_url("https://telegraph-api.example.com");
+
+let account = telegraph
+    .account("test_account")
+    .create()
+    .await
+    .unwrap();
+
+let page = telegraph.get_page("Sample-Page-12-15", true).await.unwrap();
 ```
